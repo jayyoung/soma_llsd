@@ -1,0 +1,13 @@
+string id
+string episode_id
+string waypoint
+string meta_data
+sensor_msgs/PointCloud2 cloud
+
+string transform_topic
+string rgb_img_topic
+string depth_img_topic
+string camera_info_topic
+string robot_pose_topic
+---
+soma_llsd_msgs/Scene response
