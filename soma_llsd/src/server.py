@@ -19,10 +19,36 @@ class StoreController():
         self.scene_store = MessageStoreProxy(database="soma_llsd", collection="scene_store")
         self.segment_store = MessageStoreProxy(database="soma_llsd", collection="segment_store")
         rospy.loginfo("Done!")
+
         get_scene = rospy.Service('/soma_llsd/get_scene',GetScene,self.get_scene_cb)
         insert_scene = rospy.Service('/soma_llsd/insert_scene',InsertScene,self.insert_scene_cb)
         update_scene = rospy.Service('/soma_llsd/update_scene',UpdateScene,self.update_scene_cb)
+        #insert_scene_auto - TODO
+
+
+        get_segment = rospy.Service('/soma_llsd/get_segment',GetSegment,self.get_segment_cb)
+        insert_segment = rospy.Service('/soma_llsd/insert_segment',InsertSegment,self.insert_segment_cb)
+        add_observations_to_segment = rospy.Service('/soma_llsd/add_observations_to_segment',AddObservationsToSegment,self.add_obs_cb)
+
+
         rospy.spin()
+
+    def add_obs_cb(self,req):
+        rospy.loginfo("-- Request to add observations to segment")
+        b = self.add_observations_to_segment(req.segment_id,req.observations)
+        result = AddObservationsToSegmentResponse(b)
+        return result
+
+    def insert_segment_cb(self,req):
+        rospy.loginfo("-- Request to insert segment recieved")
+        b,r = self.insert_segment(req.meta_data,req.scene_id,req.observations)
+        result = InsertSegmentResponse(b,r)
+        return result
+
+    def get_segment_cb(self,req):
+        r,s = self.get_segment(req.segment_id)
+        result = GetSegmentResponse(r,s)
+        return result
 
     def get_scene_cb(self,req):
         r,s = self.get_scene(req.scene_id)
@@ -37,7 +63,7 @@ class StoreController():
 
     def insert_scene_cb(self,req):
         rospy.loginfo("-- Request to insert scene recieved")
-        sc = self.insert_scene(req.episode_id,
+        b,r = self.insert_scene(req.episode_id,
         req.waypoint,
         req.meta_data,
         req.timestamp,
@@ -47,7 +73,7 @@ class StoreController():
         req.depth_img,
         req.camera_info,
         req.robot_pose)
-        result = InsertSceneResponse(sc)
+        result = InsertSceneResponse(b,r)
         return result
 
     def insert_scene_auto(self,req):
@@ -81,11 +107,11 @@ class StoreController():
             new_scene.camera_info = camera_info
             new_scene.robot_pose = robot_pose
             self.scene_store.insert_named(new_scene.id,new_scene)
-            rospy.loginfo("-- Scene successfully inserted")
-            return new_scene
+            rospy.loginfo("-- Scene successfully inserted with id " + new_scene.id)
+            return True,new_scene
         except Exception,e:
             rospy.loginfo(e)
-            return False
+            return False,Scene()
 
     def get_scene(self,scene_id):
         scene,meta = self.scene_store.query_named(scene_id, Scene._type)
@@ -103,19 +129,20 @@ class StoreController():
             rospy.loginfo(e)
             return False
 
-    def insert_segment(self,timestamp,meta_data,scene,observations):
+    def insert_segment(self,meta_data,scene_id,observations):
         try:
             new_segment = Segment()
             new_segment.id = str(uuid.uuid4())
-            new_segment.timestamp = timestamp
+            #new_segment.timestamp = scene.timestamp
             new_segment.meta_data = meta_data
-            new_segment.scene = scene
+            new_segment.scene_id = scene_id
             new_segment.observations = observations
             self.segment_store.insert_named(new_segment.id,new_segment)
-            return new_segment
+            rospy.loginfo("-- Success! added segment " + new_segment.id)
+            return True,new_segment
         except Exception,e:
             rospy.loginfo(e)
-            return False
+            return False,Segment()
 
     def get_segment(self,segment_id):
         segment,meta = self.segment_store.query_named(segment_id, Segment._type)
@@ -132,7 +159,7 @@ class StoreController():
             rospy.loginfo(e)
             return False
 
-    def append_observations_to_segment(self,segment_id,observations):
+    def add_observations_to_segment(self,segment_id,observations):
         try:
             segment = self.get_segment(segment_id)
             if(not segment):

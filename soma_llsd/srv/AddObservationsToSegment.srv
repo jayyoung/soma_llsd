@@ -1,0 +1,4 @@
+string segment_id
+soma_llsd_msgs/Observation[] observations
+---
+bool result

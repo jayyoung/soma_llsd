@@ -62,6 +62,9 @@ add_service_files(
    InsertSceneAuto.srv
    UpdateScene.srv
    GetScene.srv
+   AddObservationsToSegment.srv
+   InsertSegment.srv
+   GetSegment.srv
  )
 
 ## Generate actions in the 'action' folder
