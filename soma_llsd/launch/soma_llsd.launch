@@ -1,0 +1,3 @@
+<launch>
+	<node name="soma_llsd_services" type="server.py" pkg="soma_llsd" output="screen"/>
+</launch>

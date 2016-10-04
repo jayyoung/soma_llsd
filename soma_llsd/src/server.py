@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import roslib
 import rospy
 import sys
@@ -177,13 +179,4 @@ class StoreController():
 
 
 if __name__ == '__main__':
-#    rospy.loginfo("SOMa LLSD Started")
     c = StoreController()
-
-    #c.insert_scene()
-    #c.insert_segment()
-
-    #o_a = Observation()
-    #o_b = Observation()
-
-    #c.append_observations_to_segment("3165ae89-7728-4444ca7-98c2-c8289cee995f",[o_a,o_b])
