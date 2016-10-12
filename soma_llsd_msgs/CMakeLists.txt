@@ -8,9 +8,10 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   message_generation
   std_msgs
-  tf
+  tf2_msgs
   sensor_msgs
   nav_msgs
+  tf2_ros
 )
 
 ## System dependencies are found with CMake's conventions
@@ -72,7 +73,7 @@ add_message_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
    DEPENDENCIES
-  geometry_msgs std_msgs sensor_msgs nav_msgs tf
+  geometry_msgs std_msgs sensor_msgs nav_msgs tf2_msgs
 )
 
 ################################################

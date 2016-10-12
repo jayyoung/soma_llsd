@@ -150,8 +150,8 @@ class StoreController():
         segment,meta = self.segment_store.query_named(segment_id, Segment._type)
         if(not segment):
             print("Unable to find segment with ID: " + scene_id)
-            return None
-        return segment
+            return False,None
+        return True,segment
 
     def update_segment(self,segment):
         try:
@@ -169,6 +169,8 @@ class StoreController():
                 return False
 
             for o in observations:
+                if(o.id is None):
+                    o.id = str(uuid.uuid4())
                 segment.observations.append(o)
 
             self.segment_store.update_named(segment_id,segment)

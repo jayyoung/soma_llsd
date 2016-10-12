@@ -2,9 +2,9 @@ string id
 string episode_id
 string waypoint
 string meta_data
-uint32 timestamp
+int32 timestamp
 
-tf/tfMessage transform
+tf2_msgs/TFMessage transform
 sensor_msgs/PointCloud2 cloud
 sensor_msgs/Image rgb_img
 sensor_msgs/Image depth_img
