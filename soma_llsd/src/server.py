@@ -163,8 +163,8 @@ class StoreController():
 
     def add_observations_to_segment(self,segment_id,observations):
         try:
-            segment = self.get_segment(segment_id)
-            if(not segment):
+            result,segment = self.get_segment(segment_id)
+            if(result is False):
                 rospy.loginfo("Unable to find segment with ID: " + segment_id)
                 return False
 
@@ -174,6 +174,7 @@ class StoreController():
                 segment.observations.append(o)
 
             self.segment_store.update_named(segment_id,segment)
+            rospy.loginfo("-- Observations successfully added to segment")
             return True
         except Exception,e:
             rospy.loginfo(e)
