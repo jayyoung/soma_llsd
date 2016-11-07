@@ -9,6 +9,8 @@ import uuid
 import tf
 import std_msgs
 import pymongo
+from collections import deque
+from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from mongodb_store.message_store import MessageStoreProxy
 from soma_llsd_msgs.msg import Segment,Observation,Scene
 from geometry_msgs.msg import Pose,Point,Quaternion
@@ -24,6 +26,7 @@ class StoreController():
 
         get_scene = rospy.Service('/soma_llsd/get_scene',GetScene,self.get_scene_cb)
         insert_scene = rospy.Service('/soma_llsd/insert_scene',InsertScene,self.insert_scene_cb)
+        auto_insert_scene = rospy.Service('/soma_llsd/insert_scene_auto',InsertSceneAuto,self.insert_scene_auto_cb)
         update_scene = rospy.Service('/soma_llsd/update_scene',UpdateScene,self.update_scene_cb)
         #insert_scene_auto - TODO
 
@@ -37,7 +40,7 @@ class StoreController():
 
     def add_obs_cb(self,req):
         rospy.loginfo("-- Request to add observations to segment")
-        b = self.add_observations_to_segment(req.segment_id,req.observations)
+        b = self.add_observations_to_segment(req.segment_id,req.observations,req.scene_id)
         result = AddObservationsToSegmentResponse(b)
         return result
 
@@ -63,6 +66,12 @@ class StoreController():
         result = UpdateSceneResponse(sc)
         return result
 
+    def update_segment_cb(self,req):
+        rospy.loginfo("-- Request to update segment recieved")
+        sc = self.update_segment(req.input)
+        result = UpdateSegmentResponse(sc)
+        return result
+
     def insert_scene_cb(self,req):
         rospy.loginfo("-- Request to insert scene recieved")
         b,r = self.insert_scene(req.episode_id,
@@ -78,21 +87,37 @@ class StoreController():
         result = InsertSceneResponse(b,r)
         return result
 
+    def insert_scene_auto_cb(self,req):
+        rospy.loginfo("-- Request to auto insert scene recieved")
+        b,r = self.insert_scene_auto(req)
+        result = InsertSceneAutoResponse(b,r)
+        return result
+
+
     def insert_scene_auto(self,req):
         # get the messages from topics
+        listener = TransformationStore()
+        listener.create_live()
+        print("waiting for listener")
+        rospy.sleep(2)
+        listener.kill()
+        generated_transform = listener.get_as_msg()
+
+        generated_camera_info = rospy.wait_for_message(req.camera_info_topic, CameraInfo, timeout=10.0)
+        generated_robot_pose = rospy.wait_for_message(req.robot_pose_topic, geometry_msgs.msg.Pose, timeout=10.0)
+
         sc = self.insert_scene(req.episode_id,
         req.waypoint,
         req.meta_data,
         req.timestamp,
-        req.transform,
+        generated_transform,
         req.cloud,
         req.rgb_img,
         req.depth_img,
-        req.camera_info,
-        req.robot_pose)
-        result = InsertSceneResponse(sc)
+        generated_camera_info,
+        generated_robot_pose)
 
-        return result
+        return sc
 
     def insert_scene(self,episode_id,waypoint,meta_data,timestamp,tf,cloud,rgb_img,depth_img,camera_info,robot_pose):
         try:
@@ -131,14 +156,24 @@ class StoreController():
             rospy.loginfo(e)
             return False
 
+    def update_segment(self,segment):
+        try:
+            self.segment_store.update_named(segment.id, segment)
+            rospy.loginfo("-- Segment successfully updated")
+            return True
+        except Exception,e:
+            rospy.loginfo(e)
+            return False
+
     def insert_segment(self,meta_data,scene_id,observations):
         try:
             new_segment = Segment()
             new_segment.id = str(uuid.uuid4())
             #new_segment.timestamp = scene.timestamp
             new_segment.meta_data = meta_data
-            new_segment.scene_id = scene_id
+            #new_segment.scene_id = scene_id
             new_segment.observations = observations
+            new_segment.related_scenes = [scene_id]
             self.segment_store.insert_named(new_segment.id,new_segment)
             rospy.loginfo("-- Success! added segment " + new_segment.id)
             return True,new_segment
@@ -149,7 +184,7 @@ class StoreController():
     def get_segment(self,segment_id):
         segment,meta = self.segment_store.query_named(segment_id, Segment._type)
         if(not segment):
-            print("Unable to find segment with ID: " + scene_id)
+            print("Unable to find segment with ID: " + segment_id)
             return False,None
         return True,segment
 
@@ -161,14 +196,19 @@ class StoreController():
             rospy.loginfo(e)
             return False
 
-    def add_observations_to_segment(self,segment_id,observations):
+    def add_observations_to_segment(self,segment_id,observations,scene_id):
         try:
             result,segment = self.get_segment(segment_id)
+
             if(result is False):
                 rospy.loginfo("Unable to find segment with ID: " + segment_id)
                 return False
 
+            if(scene_id not in segment.related_scenes):
+                segment.related_scenes.append(scene_id)
+
             for o in observations:
+                o.scene_id = scene_id
                 if(o.id is None):
                     o.id = str(uuid.uuid4())
                 segment.observations.append(o)
@@ -180,6 +220,55 @@ class StoreController():
             rospy.loginfo(e)
             return False
 
+class TransformationStore():
+    """
+    Subscribes to /TF, stores transforms, turns into transformer when needed
+    """
+    def __init__(self):
+        self._transformations = deque([])
+        self._lively = False
+        self._max_buffer = 10
+
+    def kill(self):
+        self._sub.unregister()
+
+    def cb(self, transforms):
+        time_window = rospy.Duration(self._max_buffer)
+        for transform in transforms.transforms:
+            #rospy.loginfo("Got transform: %s - > %s"% ( transform.header.frame_id, transform.child_frame_id))
+            if self._max_buffer > 0 and len(self._transformations) > 2:
+                l =  self._transformations.popleft()
+                if (transform.header.stamp -  l.header.stamp) < time_window:
+                    self._transformations.appendleft(l)
+            self._transformations.append(transform)
+
+    def create_from_transforms(self, transforms):
+        """
+        Create a store from a given set of transforms
+        transforms: Must be a list of TransformStamped messages
+        """
+        for t in transforms:
+            self._transformations.append(t)
+        return self
+
+    def create_live(self, max_buffer=2.0):
+        # subscribe to tf and store transforms
+        self._max_buffer = max_buffer
+        self._sub = rospy.Subscriber("/tf", tf2_msgs.msg.TFMessage, self.cb)
+        self._lively = True
+        return self
+
+    def get_as_msg(self):
+        msg = tf2_msgs.msg.TFMessage()
+        msg.transforms = self._transformations
+        return msg
+
+    def msg_to_transformer(self,msg):
+        t = tf.TransformerROS()
+        transforms = TransformationStore.unpickle(msg.msg)
+        for transform in transforms._transformations:
+            t.setTransform(transform)
+        return t
 
 if __name__ == '__main__':
     c = StoreController()

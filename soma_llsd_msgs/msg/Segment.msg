@@ -1,4 +1,4 @@
 string id
 string meta_data
-string scene_id
+string[] related_scenes
 Observation[] observations
