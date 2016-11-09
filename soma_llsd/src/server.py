@@ -19,11 +19,11 @@ from soma_llsd.srv import *
 class StoreController():
     def __init__(self, db_name="somadata",scene_store_name="llsd_scene_store",segment_store_name="llsd_segment_store"):
         rospy.init_node('soma_llsd_services', anonymous = False)
-        rospy.loginfo("SOMa LLSD setting up services")
+        rospy.loginfo("LLSD: SOMa LLSD setting up services")
         self.scene_store = MessageStoreProxy(database=db_name, collection=scene_store_name)
         self.segment_store = MessageStoreProxy(database=db_name, collection=segment_store_name)
-        rospy.loginfo("Done!")
-        rospy.loginfo("Using database: " + db_name + ", scenes being stored at: " + scene_store_name + " segments being stored at " + segment_store_name)
+        rospy.loginfo("LLSD: Done!")
+        rospy.loginfo("LLSD: Using database: " + db_name + ", scenes being stored at: " + scene_store_name + " segments being stored at " + segment_store_name)
 
         get_scene = rospy.Service('/soma_llsd/get_scene',GetScene,self.get_scene_cb)
         insert_scene = rospy.Service('/soma_llsd/insert_scene',InsertScene,self.insert_scene_cb)
@@ -40,13 +40,13 @@ class StoreController():
         rospy.spin()
 
     def add_obs_cb(self,req):
-        rospy.loginfo("-- Request to add observations to segment")
+        rospy.loginfo("LLSD: -- Request to add observations to segment")
         b = self.add_observations_to_segment(req.segment_id,req.observations,req.scene_id)
         result = AddObservationsToSegmentResponse(b)
         return result
 
     def insert_segment_cb(self,req):
-        rospy.loginfo("-- Request to insert segment recieved")
+        rospy.loginfo("LLSD: -- Request to insert segment recieved")
         b,r = self.insert_segment(req.meta_data,req.scene_id,req.observations)
         result = InsertSegmentResponse(b,r)
         return result
@@ -62,19 +62,19 @@ class StoreController():
         return result
 
     def update_scene_cb(self,req):
-        rospy.loginfo("-- Request to update scene recieved")
+        rospy.loginfo("LLSD: -- Request to update scene recieved")
         sc = self.update_scene(req.input)
         result = UpdateSceneResponse(sc)
         return result
 
     def update_segment_cb(self,req):
-        rospy.loginfo("-- Request to update segment recieved")
+        rospy.loginfo("LLSD: -- Request to update segment recieved")
         sc = self.update_segment(req.input)
         result = UpdateSegmentResponse(sc)
         return result
 
     def insert_scene_cb(self,req):
-        rospy.loginfo("-- Request to insert scene recieved")
+        rospy.loginfo("LLSD: -- Request to insert scene recieved")
         b,r = self.insert_scene(req.episode_id,
         req.waypoint,
         req.meta_data,
@@ -89,7 +89,7 @@ class StoreController():
         return result
 
     def insert_scene_auto_cb(self,req):
-        rospy.loginfo("-- Request to auto insert scene recieved")
+        rospy.loginfo("LLSD: -- Request to auto insert scene recieved")
         b,r = self.insert_scene_auto(req)
         result = InsertSceneAutoResponse(b,r)
         return result
@@ -135,7 +135,7 @@ class StoreController():
             new_scene.camera_info = camera_info
             new_scene.robot_pose = robot_pose
             self.scene_store.insert_named(new_scene.id,new_scene)
-            rospy.loginfo("-- Scene successfully inserted with id " + new_scene.id)
+            rospy.loginfo("LLSD: -- Scene successfully inserted with id " + new_scene.id)
             return True,new_scene
         except Exception,e:
             rospy.loginfo(e)
@@ -151,7 +151,7 @@ class StoreController():
     def update_scene(self,scene):
         try:
             self.scene_store.update_named(scene.id, scene)
-            rospy.loginfo("-- Scene successfully updated")
+            rospy.loginfo("LLSD: -- Scene successfully updated")
             return True
         except Exception,e:
             rospy.loginfo(e)
@@ -160,7 +160,7 @@ class StoreController():
     def update_segment(self,segment):
         try:
             self.segment_store.update_named(segment.id, segment)
-            rospy.loginfo("-- Segment successfully updated")
+            rospy.loginfo("LLSD: -- Segment successfully updated")
             return True
         except Exception,e:
             rospy.loginfo(e)
@@ -176,19 +176,19 @@ class StoreController():
             new_segment.observations = observations
             new_segment.related_scenes = [scene_id]
             self.segment_store.insert_named(new_segment.id,new_segment)
-            rospy.loginfo("-- Success! added segment " + new_segment.id)
+            rospy.loginfo("LLSD: -- Success! added segment " + new_segment.id)
             return True,new_segment
         except Exception,e:
             rospy.loginfo(e)
             return False,Segment()
 
     def get_segment(self,segment_id):
-        rospy.loginfo("received get segment for: " + segment_id)
+        rospy.loginfo("LLSD: received get segment for: " + segment_id)
         segment,meta = self.segment_store.query_named(segment_id, Segment._type)
         if(not segment):
             print("Unable to find segment with ID: " + segment_id)
             return False,None
-        rospy.loginfo("success, returning segment!")
+        rospy.loginfo("LLSD: success, returning segment!")
         return True,segment
 
     def update_segment(self,segment):
@@ -204,7 +204,7 @@ class StoreController():
             result,segment = self.get_segment(segment_id)
 
             if(result is False):
-                rospy.loginfo("Unable to find segment with ID: " + segment_id)
+                rospy.loginfo("LLSD: Unable to find segment with ID: " + segment_id)
                 return False
 
             if(scene_id not in segment.related_scenes):
@@ -217,7 +217,7 @@ class StoreController():
                 segment.observations.append(o)
 
             self.segment_store.update_named(segment_id,segment)
-            rospy.loginfo("-- Observations successfully added to segment")
+            rospy.loginfo("LLSD: -- Observations successfully added to segment")
             return True
         except Exception,e:
             rospy.loginfo(e)
@@ -238,7 +238,7 @@ class TransformationStore():
     def cb(self, transforms):
         time_window = rospy.Duration(self._max_buffer)
         for transform in transforms.transforms:
-            #rospy.loginfo("Got transform: %s - > %s"% ( transform.header.frame_id, transform.child_frame_id))
+            #rospy.loginfo("LLSD: Got transform: %s - > %s"% ( transform.header.frame_id, transform.child_frame_id))
             if self._max_buffer > 0 and len(self._transformations) > 2:
                 l =  self._transformations.popleft()
                 if (transform.header.stamp -  l.header.stamp) < time_window:
@@ -286,5 +286,5 @@ if __name__ == '__main__':
         else:
             StoreController(args.db_name)
     else:
-        rospy.loginfo("Running SOMA LLSD manager with defaults")
+        rospy.loginfo("LLSD: Running SOMA LLSD manager with defaults")
         StoreController()
