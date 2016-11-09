@@ -182,10 +182,12 @@ class StoreController():
             return False,Segment()
 
     def get_segment(self,segment_id):
+        rospy.loginfo("received get segment for: " + segment_id)
         segment,meta = self.segment_store.query_named(segment_id, Segment._type)
         if(not segment):
             print("Unable to find segment with ID: " + segment_id)
             return False,None
+        rospy.loginfo("success, returning segment!")
         return True,segment
 
     def update_segment(self,segment):
