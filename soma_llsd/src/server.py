@@ -17,12 +17,13 @@ from geometry_msgs.msg import Pose,Point,Quaternion
 from soma_llsd.srv import *
 
 class StoreController():
-    def __init__(self):
+    def __init__(self, db_name="somadata",scene_store_name="llsd_scene_store",segment_store_name="llsd_segment_store"):
         rospy.init_node('soma_llsd_services', anonymous = False)
         rospy.loginfo("SOMa LLSD setting up services")
-        self.scene_store = MessageStoreProxy(database="soma_llsd", collection="scene_store")
-        self.segment_store = MessageStoreProxy(database="soma_llsd", collection="segment_store")
+        self.scene_store = MessageStoreProxy(database=db_name, collection=scene_store_name)
+        self.segment_store = MessageStoreProxy(database=db_name, collection=segment_store_name)
         rospy.loginfo("Done!")
+        rospy.loginfo("Using database: " + db_name + ", scenes being stored at: " + scene_store_name + " segments being stored at " + segment_store_name)
 
         get_scene = rospy.Service('/soma_llsd/get_scene',GetScene,self.get_scene_cb)
         insert_scene = rospy.Service('/soma_llsd/insert_scene',InsertScene,self.insert_scene_cb)
@@ -267,10 +268,23 @@ class TransformationStore():
 
     def msg_to_transformer(self,msg):
         t = tf.TransformerROS()
-        transforms = TransformationStore.unpickle(msg.msg)
-        for transform in transforms._transformations:
+        for transform in msg.transforms:
             t.setTransform(transform)
         return t
 
 if __name__ == '__main__':
-    c = StoreController()
+
+    parser = argparse.ArgumentParser(prog='server.py')
+    parser.add_argument("--db_name", nargs='?', help='Name of the database')
+    parser.add_argument('--llsd_segment_store_name', nargs='?', help='Name of the collection used to store low-level segments')
+    parser.add_argument('--llsd_scene_store_name', nargs='?', help='Name of the collection used to store low-level scenes')
+
+    args = parser.parse_args(rospy.myargv(argv=sys.argv)[1:])
+    if args.db_name is not None:
+        if args.llsd_scene_store_name is not None:
+            StoreController(args.db_name,args.llsd_scene_store_name,args.llsd_segment_store_name)
+        else:
+            StoreController(args.db_name)
+    else:
+        rospy.loginfo("Running SOMA LLSD manager with defaults")
+        StoreController()
